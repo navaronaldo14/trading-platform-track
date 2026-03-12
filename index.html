@@ -1,0 +1,2078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Algorithmic Trading Command Center</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-void: #020408;
+    --bg-deep: #050c14;
+    --bg-panel: #070f1a;
+    --bg-card: #0a1520;
+    --bg-hover: #0d1c2e;
+    --accent-cyan: #00d4ff;
+    --accent-green: #00ff88;
+    --accent-red: #ff3366;
+    --accent-amber: #ffaa00;
+    --accent-purple: #9945ff;
+    --accent-blue: #0066ff;
+    --text-primary: #e0f0ff;
+    --text-secondary: #6a8fa8;
+    --text-dim: #2a4a62;
+    --border-subtle: rgba(0, 212, 255, 0.08);
+    --border-active: rgba(0, 212, 255, 0.3);
+    --glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
+    --glow-green: 0 0 20px rgba(0, 255, 136, 0.3);
+    --glow-red: 0 0 20px rgba(255, 51, 102, 0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--bg-void);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 212, 255, 0.01) 2px,
+      rgba(0, 212, 255, 0.01) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Animated background grid */
+  .bg-grid {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .mono { font-family: 'Share Tech Mono', monospace; }
+  .orbitron { font-family: 'Orbitron', sans-serif; }
+
+  /* ===== LAYOUT ===== */
+  .layout {
+    display: grid;
+    grid-template-rows: 56px 1fr;
+    grid-template-columns: 220px 1fr;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ===== TOPBAR ===== */
+  .topbar {
+    grid-column: 1 / -1;
+    background: linear-gradient(90deg, #020b14, #050f1c, #020b14);
+    border-bottom: 1px solid var(--border-active);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 16px;
+    position: relative;
+    box-shadow: 0 1px 30px rgba(0, 212, 255, 0.1);
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--accent-cyan);
+    letter-spacing: 4px;
+    text-shadow: var(--glow-cyan);
+    margin-right: 8px;
+  }
+
+  .logo span { color: var(--text-secondary); font-size: 11px; font-weight: 400; letter-spacing: 2px; display: block; }
+
+  .topbar-divider { width: 1px; height: 30px; background: var(--border-active); margin: 0 8px; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: 1.5px;
+    padding: 4px 10px;
+    border-radius: 2px;
+    border: 1px solid;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .pill-green { color: var(--accent-green); border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.05); }
+  .pill-amber { color: var(--accent-amber); border-color: rgba(255,170,0,0.3); background: rgba(255,170,0,0.05); }
+  .pill-red { color: var(--accent-red); border-color: rgba(255,51,102,0.3); background: rgba(255,51,102,0.05); }
+
+  .pulse { width: 6px; height: 6px; border-radius: 50%; animation: pulse 1.5s ease infinite; }
+  .pulse-green { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+  .pulse-amber { background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber); }
+  .pulse-red { background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+  .clock {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--accent-cyan);
+    letter-spacing: 2px;
+  }
+
+  .nav-btn {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 2px;
+  }
+  .nav-btn:hover, .nav-btn.active {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: rgba(0,212,255,0.05);
+    box-shadow: var(--glow-cyan);
+  }
+  .nav-btn.active { background: rgba(0,212,255,0.1); }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    background: var(--bg-deep);
+    border-right: 1px solid var(--border-subtle);
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 3px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border-active); border-radius: 2px; }
+
+  .sidebar-section { padding: 12px 16px 4px; }
+  .sidebar-label {
+    font-size: 10px; letter-spacing: 2px; font-weight: 700;
+    color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .sidebar-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 13px; font-weight: 500;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+    margin: 1px 0;
+    border-left: 2px solid transparent;
+  }
+  .sidebar-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .sidebar-item.active { background: rgba(0,212,255,0.08); color: var(--accent-cyan); border-left-color: var(--accent-cyan); }
+  .sidebar-item .icon { width: 16px; text-align: center; font-size: 14px; }
+
+  .sidebar-mini-chart {
+    margin: 4px 12px 8px;
+    height: 30px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  .main {
+    overflow-y: auto;
+    background: var(--bg-void);
+    padding: 0;
+  }
+  .main::-webkit-scrollbar { width: 4px; }
+  .main::-webkit-scrollbar-track { background: transparent; }
+  .main::-webkit-scrollbar-thumb { background: var(--border-subtle); }
+
+  /* ===== PANELS / SECTIONS ===== */
+  .section { display: none; padding: 16px; }
+  .section.active { display: block; animation: fadeIn 0.3s ease; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px; font-weight: 700; letter-spacing: 3px;
+    color: var(--accent-cyan);
+    text-shadow: var(--glow-cyan);
+  }
+  .section-subtitle { font-size: 12px; color: var(--text-secondary); letter-spacing: 1px; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.2); }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .card:hover::before { opacity: 0.5; }
+
+  .card-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+    color: var(--text-dim); text-transform: uppercase;
+    margin-bottom: 8px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* ===== GRIDS ===== */
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+
+  /* ===== METRIC CARDS ===== */
+  .metric-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 24px; font-weight: 400;
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .metric-label { font-size: 11px; color: var(--text-secondary); letter-spacing: 1px; margin-top: 4px; }
+  .metric-change { font-size: 12px; font-family: 'Share Tech Mono', monospace; margin-top: 6px; }
+  .up { color: var(--accent-green); }
+  .down { color: var(--accent-red); }
+  .neutral { color: var(--accent-amber); }
+
+  /* ===== ARCHITECTURE DIAGRAM ===== */
+  .arch-pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 24px 0;
+  }
+  .arch-node {
+    flex-shrink: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-active);
+    border-radius: 4px;
+    padding: 14px 16px;
+    text-align: center;
+    min-width: 110px;
+    position: relative;
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+  .arch-node:hover {
+    background: rgba(0,212,255,0.08);
+    border-color: var(--accent-cyan);
+    box-shadow: var(--glow-cyan);
+    transform: translateY(-2px);
+  }
+  .arch-node .node-icon { font-size: 22px; margin-bottom: 6px; }
+  .arch-node .node-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--text-primary); }
+  .arch-node .node-sub { font-size: 9px; color: var(--text-secondary); margin-top: 2px; font-family: 'Share Tech Mono', monospace; }
+  .arch-node .node-status { width: 8px; height: 8px; border-radius: 50%; position: absolute; top: 8px; right: 8px; }
+
+  .arch-arrow {
+    flex-shrink: 0;
+    display: flex; align-items: center;
+    padding: 0 4px;
+    color: var(--accent-cyan);
+    font-size: 18px;
+    opacity: 0.6;
+  }
+
+  .arch-arrow-line {
+    width: 30px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-cyan), transparent);
+    position: relative;
+    animation: flow 2s linear infinite;
+  }
+
+  @keyframes flow {
+    0% { background-position: 0 0; }
+    100% { background-position: 30px 0; }
+  }
+
+  /* ===== BOT CARDS ===== */
+  .bot-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+  .bot-card:hover { border-color: rgba(0,212,255,0.25); transform: translateY(-1px); }
+  .bot-card.running { border-left: 3px solid var(--accent-green); }
+  .bot-card.stopped { border-left: 3px solid var(--text-dim); }
+  .bot-card.warning { border-left: 3px solid var(--accent-amber); }
+
+  .bot-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .bot-name { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: var(--text-primary); }
+  .bot-type { font-size: 10px; color: var(--text-secondary); letter-spacing: 1px; margin-top: 2px; font-family: 'Share Tech Mono', monospace; }
+
+  .bot-toggle {
+    width: 36px; height: 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-active);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+  .bot-toggle.on { background: rgba(0,255,136,0.2); border-color: var(--accent-green); }
+  .bot-toggle::after {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: all 0.3s;
+  }
+  .bot-toggle.on::after { left: 18px; background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+
+  .confidence-bar {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 2px;
+    height: 4px;
+    overflow: hidden;
+    margin: 8px 0;
+  }
+  .confidence-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .confidence-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 2s ease infinite;
+  }
+  @keyframes shimmer { to { left: 200%; } }
+
+  .bot-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .bot-stat { font-size: 11px; }
+  .bot-stat-label { color: var(--text-secondary); letter-spacing: 1px; font-size: 9px; font-family: 'Share Tech Mono', monospace; }
+  .bot-stat-val { font-family: 'Share Tech Mono', monospace; font-size: 12px; margin-top: 2px; }
+
+  .signal-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    padding: 3px 8px; border-radius: 2px;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .signal-buy { background: rgba(0,255,136,0.1); color: var(--accent-green); border: 1px solid rgba(0,255,136,0.3); }
+  .signal-sell { background: rgba(255,51,102,0.1); color: var(--accent-red); border: 1px solid rgba(255,51,102,0.3); }
+  .signal-hold { background: rgba(255,170,0,0.1); color: var(--accent-amber); border: 1px solid rgba(255,170,0,0.3); }
+  .signal-neutral { background: rgba(106,143,168,0.1); color: var(--text-secondary); border: 1px solid rgba(106,143,168,0.2); }
+
+  /* ===== TICKER TAPE ===== */
+  .ticker-tape {
+    background: rgba(0,212,255,0.03);
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    overflow: hidden;
+    white-space: nowrap;
+    padding: 6px 0;
+    margin-bottom: 16px;
+  }
+  .ticker-inner {
+    display: inline-block;
+    animation: ticker 40s linear infinite;
+  }
+  @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  .ticker-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+  }
+  .ticker-sym { color: var(--text-primary); font-weight: 600; }
+  .ticker-price { color: var(--text-secondary); }
+
+  /* ===== PRICE TABLE ===== */
+  .price-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .price-table th {
+    text-align: left; padding: 8px 12px;
+    font-size: 10px; letter-spacing: 2px; font-weight: 700;
+    color: var(--text-dim); border-bottom: 1px solid var(--border-subtle);
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .price-table td { padding: 10px 12px; border-bottom: 1px solid rgba(0,212,255,0.04); }
+  .price-table tr:hover td { background: rgba(0,212,255,0.03); }
+  .price-table .sym { font-weight: 700; color: var(--text-primary); font-family: 'Share Tech Mono', monospace; }
+  .price-table .price { font-family: 'Share Tech Mono', monospace; color: var(--accent-cyan); }
+
+  /* ===== POSITIONS TABLE ===== */
+  .pos-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .pos-table th { padding: 8px 10px; font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); border-bottom: 1px solid var(--border-subtle); font-family: 'Share Tech Mono', monospace; text-align: left; }
+  .pos-table td { padding: 9px 10px; border-bottom: 1px solid rgba(0,212,255,0.03); font-family: 'Share Tech Mono', monospace; }
+  .pos-table tr:hover td { background: rgba(0,212,255,0.03); }
+
+  /* ===== STRATEGY TOGGLES ===== */
+  .strategy-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+    transition: all 0.2s;
+  }
+  .strategy-card:hover { border-color: rgba(0,212,255,0.2); }
+  .strategy-card.enabled { border-left: 3px solid var(--accent-cyan); }
+  .strategy-card.disabled { border-left: 3px solid var(--text-dim); opacity: 0.6; }
+  .strategy-icon { font-size: 20px; width: 36px; text-align: center; }
+  .strategy-info { flex: 1; }
+  .strategy-name { font-size: 14px; font-weight: 700; letter-spacing: 1px; }
+  .strategy-desc { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+  .strategy-stats { display: flex; gap: 16px; margin-top: 6px; }
+  .strategy-stat { font-size: 11px; font-family: 'Share Tech Mono', monospace; }
+
+  /* ===== ALERTS ===== */
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    border-radius: 2px;
+    margin-bottom: 6px;
+    border-left: 3px solid;
+    background: var(--bg-card);
+    font-size: 12px;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  .alert-critical { border-left-color: var(--accent-red); background: rgba(255,51,102,0.05); }
+  .alert-warning { border-left-color: var(--accent-amber); background: rgba(255,170,0,0.05); }
+  .alert-info { border-left-color: var(--accent-cyan); background: rgba(0,212,255,0.05); }
+  .alert-success { border-left-color: var(--accent-green); background: rgba(0,255,136,0.05); }
+  .alert-time { font-family: 'Share Tech Mono', monospace; color: var(--text-dim); font-size: 10px; flex-shrink: 0; }
+  .alert-msg { color: var(--text-primary); font-weight: 500; }
+  .alert-channel { margin-top: 3px; font-size: 10px; color: var(--text-secondary); font-family: 'Share Tech Mono', monospace; }
+
+  /* ===== WORKFLOW ===== */
+  .workflow-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 24px;
+    overflow-x: auto;
+  }
+  .workflow-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 20px;
+    min-width: max-content;
+  }
+  .wf-node {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-active);
+    border-radius: 6px;
+    padding: 10px 14px;
+    text-align: center;
+    min-width: 100px;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .wf-node:hover { border-color: var(--accent-cyan); box-shadow: var(--glow-cyan); }
+  .wf-node .wf-icon { font-size: 16px; margin-bottom: 4px; }
+  .wf-node .wf-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--text-primary); }
+  .wf-node .wf-type { font-size: 9px; color: var(--text-secondary); font-family: 'Share Tech Mono', monospace; }
+  .wf-node.trigger { border-color: rgba(153,69,255,0.4); background: rgba(153,69,255,0.05); }
+  .wf-node.action { border-color: rgba(0,212,255,0.3); }
+  .wf-node.condition { border-color: rgba(255,170,0,0.3); background: rgba(255,170,0,0.05); border-radius: 0; transform: rotate(45deg); padding: 8px; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
+  .wf-node.condition > div { transform: rotate(-45deg); }
+  .wf-node.output { border-color: rgba(0,255,136,0.3); background: rgba(0,255,136,0.05); }
+  .wf-conn { width: 30px; height: 2px; background: var(--border-active); position: relative; flex-shrink: 0; }
+  .wf-conn::after { content: '▶'; position: absolute; right: -6px; top: -6px; color: var(--accent-cyan); font-size: 10px; }
+  .wf-conn.active { background: var(--accent-cyan); animation: connPulse 1.5s ease infinite; }
+  @keyframes connPulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+  /* ===== CHANNEL BUTTONS ===== */
+  .channel-btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .channel-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid;
+    border-radius: 2px;
+    font-size: 12px; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  .ch-telegram { border-color: rgba(0,150,255,0.4); color: #0096ff; background: rgba(0,150,255,0.05); }
+  .ch-telegram:hover { background: rgba(0,150,255,0.15); box-shadow: 0 0 12px rgba(0,150,255,0.3); }
+  .ch-email { border-color: rgba(255,170,0,0.4); color: var(--accent-amber); background: rgba(255,170,0,0.05); }
+  .ch-email:hover { background: rgba(255,170,0,0.15); }
+  .ch-web { border-color: rgba(0,255,136,0.4); color: var(--accent-green); background: rgba(0,255,136,0.05); }
+  .ch-web:hover { background: rgba(0,255,136,0.15); }
+
+  /* ===== PROGRESS BARS ===== */
+  .progress-bar { background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 2px; height: 6px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+
+  /* ===== CHART CONTAINERS ===== */
+  .chart-wrap { position: relative; }
+
+  /* ===== RISK GAUGE ===== */
+  .risk-gauge { text-align: center; padding: 8px; }
+  .gauge-value { font-family: 'Orbitron', sans-serif; font-size: 28px; font-weight: 700; }
+  .gauge-label { font-size: 10px; letter-spacing: 2px; color: var(--text-secondary); margin-top: 4px; font-family: 'Share Tech Mono', monospace; }
+
+  /* ===== SCROLLBARS ===== */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 2px; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 1200px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: 56px auto 1fr; }
+    .sidebar { display: none; }
+    .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  /* Corner decoration */
+  .corner-deco {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: var(--accent-cyan);
+    border-style: solid;
+    opacity: 0.4;
+  }
+  .corner-tl { top: 4px; left: 4px; border-width: 1px 0 0 1px; }
+  .corner-tr { top: 4px; right: 4px; border-width: 1px 1px 0 0; }
+  .corner-bl { bottom: 4px; left: 4px; border-width: 0 0 1px 1px; }
+  .corner-br { bottom: 4px; right: 4px; border-width: 0 1px 1px 0; }
+
+  /* Glow border animation */
+  @keyframes borderGlow {
+    0%, 100% { box-shadow: 0 0 4px rgba(0,212,255,0.2); }
+    50% { box-shadow: 0 0 16px rgba(0,212,255,0.5); }
+  }
+
+  .number-counter {
+    display: inline-block;
+    font-family: 'Share Tech Mono', monospace;
+  }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<div class="layout">
+
+  <!-- ===== TOPBAR ===== -->
+  <header class="topbar">
+    <div class="logo">NEXUS<span>ALGO TRADING PLATFORM v4.2</span></div>
+    <div class="topbar-divider"></div>
+    <div class="status-pill pill-green"><div class="pulse pulse-green"></div>ALL SYSTEMS OPERATIONAL</div>
+    <div class="status-pill pill-amber"><div class="pulse pulse-amber"></div>7 BOTS ACTIVE</div>
+    <div class="status-pill pill-green"><div class="pulse pulse-green"></div>MARKETS OPEN</div>
+
+    <div style="display:flex;gap:6px;margin-left:8px;">
+      <button class="nav-btn active" onclick="showSection('overview')">OVERVIEW</button>
+      <button class="nav-btn" onclick="showSection('architecture')">ARCH</button>
+      <button class="nav-btn" onclick="showSection('bots')">BOTS</button>
+      <button class="nav-btn" onclick="showSection('markets')">MARKETS</button>
+      <button class="nav-btn" onclick="showSection('portfolio')">PORTFOLIO</button>
+      <button class="nav-btn" onclick="showSection('strategy')">STRATEGY</button>
+      <button class="nav-btn" onclick="showSection('alerts')">ALERTS</button>
+      <button class="nav-btn" onclick="showSection('automation')">AUTOMATION</button>
+    </div>
+
+    <div class="topbar-right">
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="status-pill pill-green" style="font-size:10px;"><div class="pulse pulse-green"></div>NSE/BSE</div>
+      <div class="status-pill pill-green" style="font-size:10px;"><div class="pulse pulse-green"></div>NYSE/NASDAQ</div>
+      <div class="status-pill pill-amber" style="font-size:10px;"><div class="pulse pulse-amber"></div>CRYPTO 24/7</div>
+    </div>
+  </header>
+
+  <!-- ===== SIDEBAR ===== -->
+  <nav class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <div class="sidebar-item active" onclick="showSection('overview')"><span class="icon">⬡</span> Overview</div>
+      <div class="sidebar-item" onclick="showSection('architecture')"><span class="icon">⬢</span> Architecture</div>
+      <div class="sidebar-item" onclick="showSection('bots')"><span class="icon">◈</span> Bot Manager</div>
+      <div class="sidebar-item" onclick="showSection('markets')"><span class="icon">◉</span> Markets</div>
+      <div class="sidebar-item" onclick="showSection('portfolio')"><span class="icon">◆</span> Portfolio</div>
+      <div class="sidebar-item" onclick="showSection('strategy')"><span class="icon">◇</span> Strategy</div>
+      <div class="sidebar-item" onclick="showSection('alerts')"><span class="icon">◎</span> Alerts</div>
+      <div class="sidebar-item" onclick="showSection('automation')"><span class="icon">⬡</span> Automation</div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:8px;">
+      <div class="sidebar-label">Market Status</div>
+      <div style="padding:8px 12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-subtle);">
+          <span style="font-size:12px;color:var(--text-secondary);">NIFTY 50</span>
+          <span class="mono up" style="font-size:12px;">24,812</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-subtle);">
+          <span style="font-size:12px;color:var(--text-secondary);">SENSEX</span>
+          <span class="mono up" style="font-size:12px;">81,234</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-subtle);">
+          <span style="font-size:12px;color:var(--text-secondary);">S&P 500</span>
+          <span class="mono up" style="font-size:12px;">5,842</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-subtle);">
+          <span style="font-size:12px;color:var(--text-secondary);">NASDAQ</span>
+          <span class="mono down" style="font-size:12px;">19,441</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;">
+          <span style="font-size:12px;color:var(--text-secondary);">BTC/USD</span>
+          <span class="mono up" style="font-size:12px;">98,440</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:4px;">
+      <div class="sidebar-label">Quick Stats</div>
+      <div style="padding:6px 12px;">
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:11px;color:var(--text-secondary);">Bot Uptime</span>
+            <span class="mono" style="font-size:11px;color:var(--accent-green);">99.4%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:99%;background:var(--accent-green);"></div></div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:11px;color:var(--text-secondary);">Risk Exposure</span>
+            <span class="mono" style="font-size:11px;color:var(--accent-amber);">34%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:34%;background:var(--accent-amber);"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="font-size:11px;color:var(--text-secondary);">Win Rate</span>
+            <span class="mono" style="font-size:11px;color:var(--accent-cyan);">68.4%</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:68%;background:var(--accent-cyan);"></div></div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="main">
+
+    <!-- ===== TICKER TAPE ===== -->
+    <div class="ticker-tape">
+      <div class="ticker-inner" id="tickerInner"></div>
+    </div>
+
+    <!-- ===== SECTION: OVERVIEW ===== -->
+    <div id="sec-overview" class="section active">
+      <div class="section-header">
+        <div>
+          <div class="section-title">COMMAND OVERVIEW</div>
+          <div class="section-subtitle">Real-time platform metrics · Updated every 500ms</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <div class="status-pill pill-green"><div class="pulse pulse-green"></div>LIVE</div>
+        </div>
+      </div>
+
+      <!-- Top KPIs -->
+      <div class="grid-4" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="corner-tl"></div><div class="corner-tr"></div><div class="corner-bl"></div><div class="corner-br"></div>
+          <div class="card-title">Total Portfolio Value</div>
+          <div class="metric-value" style="color:var(--accent-cyan);" id="portVal">₹1,24,82,340</div>
+          <div class="metric-change up">▲ +2.34% today</div>
+        </div>
+        <div class="card">
+          <div class="corner-tl"></div><div class="corner-tr"></div><div class="corner-bl"></div><div class="corner-br"></div>
+          <div class="card-title">Daily P&L</div>
+          <div class="metric-value up" id="dailyPnl">+₹2,84,120</div>
+          <div class="metric-change up">▲ Best day in 14 days</div>
+        </div>
+        <div class="card">
+          <div class="corner-tl"></div><div class="corner-tr"></div><div class="corner-bl"></div><div class="corner-br"></div>
+          <div class="card-title">Active Bots</div>
+          <div class="metric-value" style="color:var(--accent-green);">7 / 8</div>
+          <div class="metric-change neutral">1 in maintenance mode</div>
+        </div>
+        <div class="card">
+          <div class="corner-tl"></div><div class="corner-tr"></div><div class="corner-bl"></div><div class="corner-br"></div>
+          <div class="card-title">Open Positions</div>
+          <div class="metric-value" style="color:var(--accent-amber);">23</div>
+          <div class="metric-change">12 IN · 5 US · 6 CRYPTO</div>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:14px;">
+        <div class="card" style="grid-column: span 2;">
+          <div class="card-title">Portfolio P&L — 30 Day Equity Curve</div>
+          <div class="chart-wrap" style="height:200px;">
+            <canvas id="equityChart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Market Exposure</div>
+          <div class="chart-wrap" style="height:200px;">
+            <canvas id="exposureChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-4" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-title">Signals Today</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span class="signal-badge signal-buy">▲ BUY</span>
+              <span class="mono" style="font-size:14px;color:var(--accent-green);">34</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span class="signal-badge signal-sell">▼ SELL</span>
+              <span class="mono" style="font-size:14px;color:var(--accent-red);">18</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <span class="signal-badge signal-hold">◈ HOLD</span>
+              <span class="mono" style="font-size:14px;color:var(--accent-amber);">47</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Execution Stats</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--text-secondary);">Orders Executed</span>
+              <span class="mono" style="color:var(--accent-cyan);">142</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--text-secondary);">Fill Rate</span>
+              <span class="mono" style="color:var(--accent-green);">99.2%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--text-secondary);">Avg Slippage</span>
+              <span class="mono" style="color:var(--accent-amber);">0.04%</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Risk Metrics</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--text-secondary);">Max Drawdown</span>
+              <span class="mono down">-4.82%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--text-secondary);">Sharpe Ratio</span>
+              <span class="mono up">2.14</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--text-secondary);">VaR (95%)</span>
+              <span class="mono neutral">₹3.2L</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Win/Loss</div>
+          <div style="text-align:center;padding:8px 0;">
+            <div class="mono" style="font-size:32px;color:var(--accent-green);">68.4%</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">WIN RATE · 30D</div>
+            <div style="display:flex;gap:4px;margin-top:10px;">
+              <div style="flex:0.684;height:6px;background:var(--accent-green);border-radius:2px 0 0 2px;"></div>
+              <div style="flex:0.316;height:6px;background:var(--accent-red);border-radius:0 2px 2px 0;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:4px;">
+              <span class="mono" style="font-size:10px;color:var(--accent-green);">97W</span>
+              <span class="mono" style="font-size:10px;color:var(--accent-red);">45L</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volume chart -->
+      <div class="card">
+        <div class="card-title">Intraday Volume — NSE/BSE/NYSE/CRYPTO Combined</div>
+        <div class="chart-wrap" style="height:120px;">
+          <canvas id="volumeChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION: ARCHITECTURE ===== -->
+    <div id="sec-architecture" class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">SYSTEM ARCHITECTURE</div>
+          <div class="section-subtitle">Data pipeline · Processing layers · Execution chain</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title">Trading Data Pipeline — End to End</div>
+        <div class="arch-pipeline">
+          <div class="arch-node" style="border-color:rgba(153,69,255,0.5);">
+            <div class="node-icon">📡</div>
+            <div class="node-title">MARKET DATA APIs</div>
+            <div class="node-sub">NSE/BSE · NYSE · BINANCE</div>
+            <div class="node-status" style="background:var(--accent-green);box-shadow:0 0 6px var(--accent-green);"></div>
+          </div>
+          <div class="arch-arrow">──▶</div>
+          <div class="arch-node">
+            <div class="node-icon">🗄️</div>
+            <div class="node-title">DATA STORAGE</div>
+            <div class="node-sub">TimescaleDB · Redis</div>
+            <div class="node-status" style="background:var(--accent-green);box-shadow:0 0 6px var(--accent-green);"></div>
+          </div>
+          <div class="arch-arrow">──▶</div>
+          <div class="arch-node">
+            <div class="node-icon">🔬</div>
+            <div class="node-title">RESEARCH BOTS</div>
+            <div class="node-sub">TA · Fundamental · Sentiment</div>
+            <div class="node-status" style="background:var(--accent-green);box-shadow:0 0 6px var(--accent-green);"></div>
+          </div>
+          <div class="arch-arrow">──▶</div>
+          <div class="arch-node" style="border-color:rgba(0,212,255,0.4);">
+            <div class="node-icon">⚡</div>
+            <div class="node-title">SIGNAL AGGREGATOR</div>
+            <div class="node-sub">Ensemble Voting</div>
+            <div class="node-status" style="background:var(--accent-green);box-shadow:0 0 6px var(--accent-green);"></div>
+          </div>
+          <div class="arch-arrow">──▶</div>
+          <div class="arch-node" style="border-color:rgba(255,170,0,0.4);">
+            <div class="node-icon">🛡️</div>
+            <div class="node-title">RISK ENGINE</div>
+            <div class="node-sub">Position Sizing · VaR</div>
+            <div class="node-status" style="background:var(--accent-amber);box-shadow:0 0 6px var(--accent-amber);"></div>
+          </div>
+          <div class="arch-arrow">──▶</div>
+          <div class="arch-node">
+            <div class="node-icon">⚙️</div>
+            <div class="node-title">EXECUTION ENGINE</div>
+            <div class="node-sub">Smart Order Router</div>
+            <div class="node-status" style="background:var(--accent-green);box-shadow:0 0 6px var(--accent-green);"></div>
+          </div>
+          <div class="arch-arrow">──▶</div>
+          <div class="arch-node" style="border-color:rgba(0,255,136,0.4);">
+            <div class="node-icon">🏦</div>
+            <div class="node-title">BROKER APIs</div>
+            <div class="node-sub">Zerodha · IBKR · Binance</div>
+            <div class="node-status" style="background:var(--accent-green);box-shadow:0 0 6px var(--accent-green);"></div>
+          </div>
+          <div class="arch-arrow">──▶</div>
+          <div class="arch-node" style="border-color:rgba(0,212,255,0.6);background:rgba(0,212,255,0.05);">
+            <div class="node-icon">📊</div>
+            <div class="node-title">MONITORING DASHBOARD</div>
+            <div class="node-sub">NEXUS Platform</div>
+            <div class="node-status" style="background:var(--accent-cyan);box-shadow:0 0 6px var(--accent-cyan);"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Component details -->
+      <div class="grid-4" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-title">Data Ingestion</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+            <div>📡 NSE/BSE — Zerodha Kite API</div>
+            <div>📡 NYSE/NASDAQ — Alpaca API</div>
+            <div>📡 Crypto — Binance WebSocket</div>
+            <div style="margin-top:6px;color:var(--accent-cyan);" class="mono">Latency: 2-5ms</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Data Layer</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+            <div>🗄️ TimescaleDB — OHLCV data</div>
+            <div>⚡ Redis — Live cache</div>
+            <div>📦 S3 — Historical archive</div>
+            <div style="margin-top:6px;color:var(--accent-cyan);" class="mono">5M+ ticks/day</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Signal Engine</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+            <div>🧠 Ensemble ML voting</div>
+            <div>📊 Confidence thresholding</div>
+            <div>🔀 Multi-timeframe fusion</div>
+            <div style="margin-top:6px;color:var(--accent-cyan);" class="mono">Signal latency: 8ms</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Execution</div>
+          <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+            <div>🔀 Smart order routing</div>
+            <div>💰 TWAP / VWAP algos</div>
+            <div>🛡️ Pre-trade risk checks</div>
+            <div style="margin-top:6px;color:var(--accent-cyan);" class="mono">Fill rate: 99.2%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Infrastructure Stack</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+              <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;" class="mono">BACKEND</div>
+              <div style="font-size:12px;margin-top:4px;color:var(--text-secondary);">Python FastAPI<br>Celery Workers<br>Docker / K8s</div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+              <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;" class="mono">FRONTEND</div>
+              <div style="font-size:12px;margin-top:4px;color:var(--text-secondary);">WebSocket Streams<br>Real-time Charts<br>Alert Engine</div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+              <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;" class="mono">ML STACK</div>
+              <div style="font-size:12px;margin-top:4px;color:var(--text-secondary);">TensorFlow<br>Scikit-learn<br>TA-Lib</div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+              <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;" class="mono">MONITORING</div>
+              <div style="font-size:12px;margin-top:4px;color:var(--text-secondary);">Prometheus<br>Grafana<br>PagerDuty</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">System Health</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;color:var(--text-secondary);">API Gateway</span>
+                <span class="mono up" style="font-size:12px;">● HEALTHY</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:98%;background:var(--accent-green);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;color:var(--text-secondary);">Database Cluster</span>
+                <span class="mono up" style="font-size:12px;">● HEALTHY</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:95%;background:var(--accent-green);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;color:var(--text-secondary);">Execution Engine</span>
+                <span class="mono up" style="font-size:12px;">● HEALTHY</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:100%;background:var(--accent-green);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;color:var(--text-secondary);">ML Inference</span>
+                <span class="mono neutral" style="font-size:12px;">● DEGRADED</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:72%;background:var(--accent-amber);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;color:var(--text-secondary);">Message Queue</span>
+                <span class="mono up" style="font-size:12px;">● HEALTHY</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:91%;background:var(--accent-green);"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION: BOTS ===== -->
+    <div id="sec-bots" class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">BOT MANAGEMENT</div>
+          <div class="section-subtitle">7 bots active · Monitoring all markets</div>
+        </div>
+        <div style="margin-left:auto;">
+          <button class="nav-btn" onclick="toggleAllBots(true)">START ALL</button>
+          <button class="nav-btn" onclick="toggleAllBots(false)" style="margin-left:6px;">STOP ALL</button>
+        </div>
+      </div>
+
+      <div class="grid-auto" id="botGrid"></div>
+    </div>
+
+    <!-- ===== SECTION: MARKETS ===== -->
+    <div id="sec-markets" class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">MARKET MONITORING</div>
+          <div class="section-subtitle">Live prices · Technical indicators · Volume analysis</div>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-title">Indian Markets — NSE/BSE</div>
+          <table class="price-table">
+            <thead><tr><th>SYMBOL</th><th>PRICE</th><th>CHANGE</th><th>VOLUME</th></tr></thead>
+            <tbody id="indiaTable"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">US Markets — NYSE/NASDAQ</div>
+          <table class="price-table">
+            <thead><tr><th>SYMBOL</th><th>PRICE</th><th>CHANGE</th><th>VOLUME</th></tr></thead>
+            <tbody id="usTable"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Crypto Markets — 24/7</div>
+          <table class="price-table">
+            <thead><tr><th>PAIR</th><th>PRICE</th><th>CHANGE</th><th>VOLUME</th></tr></thead>
+            <tbody id="cryptoTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-title">NIFTY 50 — Intraday Chart</div>
+          <div class="chart-wrap" style="height:220px;">
+            <canvas id="niftyChart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">BTC/USD — 4H Chart</div>
+          <div class="chart-wrap" style="height:220px;">
+            <canvas id="btcChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technical Indicators -->
+      <div class="card">
+        <div class="card-title">Technical Indicators — NIFTY 50</div>
+        <div class="grid-4" style="margin-top:10px;">
+          <div style="text-align:center;padding:10px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+            <div style="font-size:10px;color:var(--text-dim);" class="mono">RSI (14)</div>
+            <div style="font-size:24px;font-family:'Share Tech Mono';color:var(--accent-amber);margin-top:4px;">58.4</div>
+            <div style="font-size:10px;color:var(--accent-amber);margin-top:2px;">NEUTRAL</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+            <div style="font-size:10px;color:var(--text-dim);" class="mono">MACD</div>
+            <div style="font-size:24px;font-family:'Share Tech Mono';color:var(--accent-green);margin-top:4px;">+42.3</div>
+            <div style="font-size:10px;color:var(--accent-green);margin-top:2px;">BULLISH</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+            <div style="font-size:10px;color:var(--text-dim);" class="mono">BOLLINGER</div>
+            <div style="font-size:24px;font-family:'Share Tech Mono';color:var(--accent-cyan);margin-top:4px;">MID</div>
+            <div style="font-size:10px;color:var(--accent-cyan);margin-top:2px;">24,750 ± 280</div>
+          </div>
+          <div style="text-align:center;padding:10px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+            <div style="font-size:10px;color:var(--text-dim);" class="mono">ATR (14)</div>
+            <div style="font-size:24px;font-family:'Share Tech Mono';color:var(--accent-purple);margin-top:4px;">182</div>
+            <div style="font-size:10px;color:var(--accent-purple);margin-top:2px;">NORMAL VOL</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION: PORTFOLIO ===== -->
+    <div id="sec-portfolio" class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">PORTFOLIO PANEL</div>
+          <div class="section-subtitle">Positions · P&L · Risk exposure · Drawdown</div>
+        </div>
+      </div>
+
+      <div class="grid-4" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="corner-tl"></div><div class="corner-br"></div>
+          <div class="card-title">Total AUM</div>
+          <div class="metric-value" style="color:var(--accent-cyan);">₹1.24 Cr</div>
+          <div class="metric-change up">▲ +₹28.4L YTD</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Today's P&L</div>
+          <div class="metric-value up">+₹2,84,120</div>
+          <div class="metric-change up">▲ +2.34%</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Max Drawdown</div>
+          <div class="metric-value down">-4.82%</div>
+          <div class="metric-change">Peak: ₹1.32 Cr</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Margin Used</div>
+          <div class="metric-value neutral">34%</div>
+          <div style="margin-top:8px;">
+            <div class="progress-bar" style="height:8px;"><div class="progress-fill" style="width:34%;background:linear-gradient(90deg,var(--accent-green),var(--accent-amber));"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-title">Open Positions</div>
+          <table class="pos-table">
+            <thead>
+              <tr><th>SYMBOL</th><th>QTY</th><th>ENTRY</th><th>LTP</th><th>P&L</th><th>ACTION</th></tr>
+            </thead>
+            <tbody id="positionsTable"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">Portfolio Allocation</div>
+          <div class="chart-wrap" style="height:240px;">
+            <canvas id="allocChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">Risk Exposure by Market</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;">Indian Equities</span><span class="mono up">₹42.4L</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:34%;background:var(--accent-cyan);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;">US Equities</span><span class="mono up">$18,420</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:28%;background:var(--accent-blue);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;">Crypto</span><span class="mono neutral">₹31.2L</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:25%;background:var(--accent-purple);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;">Cash Reserve</span><span class="mono" style="color:var(--text-secondary);">₹16.2L</span>
+              </div>
+              <div class="progress-bar"><div class="progress-fill" style="width:13%;background:var(--text-dim);"></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Performance Metrics</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Sharpe Ratio</span><span class="mono up">2.14</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Sortino Ratio</span><span class="mono up">3.28</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Calmar Ratio</span><span class="mono up">1.84</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Beta (vs Nifty)</span><span class="mono neutral">0.72</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;">
+              <span style="color:var(--text-secondary);font-size:12px;">Alpha (annualized)</span><span class="mono up">+18.4%</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">P&L Breakdown</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Realized P&L (Today)</span><span class="mono up">+₹2,12,400</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Unrealized P&L</span><span class="mono up">+₹71,720</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">MTD P&L</span><span class="mono up">+₹8,42,100</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">YTD P&L</span><span class="mono up">+₹28,40,000</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;">
+              <span style="color:var(--text-secondary);font-size:12px;">Brokerage & Fees</span><span class="mono down">-₹42,380</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION: STRATEGY ===== -->
+    <div id="sec-strategy" class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">STRATEGY CONTROL</div>
+          <div class="section-subtitle">Enable · Disable · Configure trading strategies</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;" id="strategyList"></div>
+    </div>
+
+    <!-- ===== SECTION: ALERTS ===== -->
+    <div id="sec-alerts" class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">ALERT SYSTEM</div>
+          <div class="section-subtitle">Multi-channel notifications · Telegram · Email · Web push</div>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="card-title">Notification Channels</div>
+          <div class="channel-btns">
+            <button class="channel-btn ch-telegram" onclick="testAlert('telegram')">✈ Telegram Bot</button>
+            <button class="channel-btn ch-email" onclick="testAlert('email')">✉ Email SMTP</button>
+            <button class="channel-btn ch-web" onclick="testAlert('web')">🔔 Web Push</button>
+          </div>
+          <div style="margin-top:12px;">
+            <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;" class="mono">ALERT THRESHOLDS</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+                <span style="font-size:12px;">Price Alert</span>
+                <span class="mono" style="color:var(--accent-green);font-size:11px;">ENABLED</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+                <span style="font-size:12px;">P&L Alert (&gt; ±2%)</span>
+                <span class="mono" style="color:var(--accent-green);font-size:11px;">ENABLED</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+                <span style="font-size:12px;">Bot Failure</span>
+                <span class="mono" style="color:var(--accent-green);font-size:11px;">ENABLED</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;">
+                <span style="font-size:12px;">Risk Breach</span>
+                <span class="mono" style="color:var(--accent-red);font-size:11px;">CRITICAL</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="grid-column:span 2;">
+          <div class="card-title">Live Alert Feed</div>
+          <div id="alertFeed"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Alert Statistics — Last 24 Hours</div>
+        <div class="chart-wrap" style="height:120px;">
+          <canvas id="alertChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SECTION: AUTOMATION ===== -->
+    <div id="sec-automation" class="section">
+      <div class="section-header">
+        <div>
+          <div class="section-title">BOT AUTOMATION FLOW</div>
+          <div class="section-subtitle">n8n-style visual workflow engine · Drag &amp; drop automation</div>
+        </div>
+      </div>
+
+      <div class="workflow-container" style="margin-bottom:14px;">
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:20px;font-family:'Share Tech Mono';">WORKFLOW 1 — SIGNAL DETECTION → ORDER EXECUTION</div>
+
+        <div class="workflow-row">
+          <div class="wf-node trigger">
+            <div class="wf-icon">⏱</div>
+            <div class="wf-label">CRON TRIGGER</div>
+            <div class="wf-type">Every 5min</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node action">
+            <div class="wf-icon">📡</div>
+            <div class="wf-label">FETCH PRICES</div>
+            <div class="wf-type">Zerodha API</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node action">
+            <div class="wf-icon">🧮</div>
+            <div class="wf-label">CALC INDICATORS</div>
+            <div class="wf-type">TA-Lib</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node action">
+            <div class="wf-icon">🤖</div>
+            <div class="wf-label">ML PREDICT</div>
+            <div class="wf-type">LSTM Model</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node" style="border-color:rgba(255,170,0,0.4);background:rgba(255,170,0,0.05);">
+            <div class="wf-icon">❓</div>
+            <div class="wf-label">CONFIDENCE CHECK</div>
+            <div class="wf-type">&gt; 70%?</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node">
+            <div class="wf-icon">🛡️</div>
+            <div class="wf-label">RISK CHECK</div>
+            <div class="wf-type">Pre-trade</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node output">
+            <div class="wf-icon">📤</div>
+            <div class="wf-label">PLACE ORDER</div>
+            <div class="wf-type">Broker API</div>
+          </div>
+          <div class="wf-conn"></div>
+          <div class="wf-node output">
+            <div class="wf-icon">🔔</div>
+            <div class="wf-label">SEND ALERT</div>
+            <div class="wf-type">Telegram + Email</div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text-secondary);margin:20px 0 16px;font-family:'Share Tech Mono';">WORKFLOW 2 — NEWS SENTIMENT → FILTER → SIGNAL</div>
+        <div class="workflow-row">
+          <div class="wf-node trigger" style="border-color:rgba(0,212,255,0.4);">
+            <div class="wf-icon">📰</div>
+            <div class="wf-label">NEWS FEED</div>
+            <div class="wf-type">RSS + Twitter</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node action">
+            <div class="wf-icon">🧠</div>
+            <div class="wf-label">NLP SENTIMENT</div>
+            <div class="wf-type">BERT Model</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node" style="border-color:rgba(255,170,0,0.4);background:rgba(255,170,0,0.05);">
+            <div class="wf-icon">🔍</div>
+            <div class="wf-label">RELEVANCE FILTER</div>
+            <div class="wf-type">Score &gt; 0.8?</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node action">
+            <div class="wf-icon">⚡</div>
+            <div class="wf-label">SIGNAL AGGREGATE</div>
+            <div class="wf-type">Ensemble Vote</div>
+          </div>
+          <div class="wf-conn"></div>
+          <div class="wf-node output">
+            <div class="wf-icon">📊</div>
+            <div class="wf-label">UPDATE DASHBOARD</div>
+            <div class="wf-type">WebSocket Push</div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text-secondary);margin:20px 0 16px;font-family:'Share Tech Mono';">WORKFLOW 3 — RISK MONITOR → STOP LOSS → EMERGENCY CLOSE</div>
+        <div class="workflow-row">
+          <div class="wf-node trigger" style="border-color:rgba(255,51,102,0.4);background:rgba(255,51,102,0.05);">
+            <div class="wf-icon">⚠️</div>
+            <div class="wf-label">RISK MONITOR</div>
+            <div class="wf-type">Every 1s</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node" style="border-color:rgba(255,170,0,0.4);background:rgba(255,170,0,0.05);">
+            <div class="wf-icon">❓</div>
+            <div class="wf-label">DRAWDOWN CHECK</div>
+            <div class="wf-type">&gt; 5%?</div>
+          </div>
+          <div class="wf-conn active"></div>
+          <div class="wf-node action" style="border-color:rgba(255,51,102,0.4);">
+            <div class="wf-icon">🛑</div>
+            <div class="wf-label">HALT TRADING</div>
+            <div class="wf-type">Kill Switch</div>
+          </div>
+          <div class="wf-conn"></div>
+          <div class="wf-node output" style="border-color:rgba(255,51,102,0.4);">
+            <div class="wf-icon">📤</div>
+            <div class="wf-label">CLOSE ALL POSITIONS</div>
+            <div class="wf-type">Market Orders</div>
+          </div>
+          <div class="wf-conn"></div>
+          <div class="wf-node output">
+            <div class="wf-icon">🚨</div>
+            <div class="wf-label">CRITICAL ALERT</div>
+            <div class="wf-type">All Channels</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Workflow Execution Stats</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Total Executions Today</span><span class="mono up">2,847</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Success Rate</span><span class="mono up">99.6%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-subtle);">
+              <span style="color:var(--text-secondary);font-size:12px;">Avg Execution Time</span><span class="mono">42ms</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;">
+              <span style="color:var(--text-secondary);font-size:12px;">Failed Workflows</span><span class="mono down">11</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Automation Integrations</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">✈</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;">Telegram</div>
+                <div class="mono up" style="font-size:10px;">CONNECTED</div>
+              </div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">✉</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;">SMTP Email</div>
+                <div class="mono up" style="font-size:10px;">CONNECTED</div>
+              </div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">🏦</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;">Zerodha Kite</div>
+                <div class="mono up" style="font-size:10px;">CONNECTED</div>
+              </div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">🌐</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;">IBKR TWS</div>
+                <div class="mono up" style="font-size:10px;">CONNECTED</div>
+              </div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">₿</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;">Binance API</div>
+                <div class="mono up" style="font-size:10px;">CONNECTED</div>
+              </div>
+            </div>
+            <div style="padding:8px;background:var(--bg-panel);border:1px solid var(--border-subtle);border-radius:2px;display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;">📊</span>
+              <div>
+                <div style="font-size:12px;font-weight:700;">Webhook API</div>
+                <div class="mono up" style="font-size:10px;">ACTIVE</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  const ist = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Kolkata"}));
+  const h = String(ist.getHours()).padStart(2,'0');
+  const m = String(ist.getMinutes()).padStart(2,'0');
+  const s = String(ist.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${h}:${m}:${s} IST`;
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ===== NAVIGATION =====
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+}
+
+// ===== TICKER TAPE =====
+const tickers = [
+  {sym:'RELIANCE', price:'₹2,847', chg:'+1.2%', color:'#00ff88'},
+  {sym:'TCS', price:'₹3,912', chg:'+0.8%', color:'#00ff88'},
+  {sym:'INFY', price:'₹1,484', chg:'-0.4%', color:'#ff3366'},
+  {sym:'HDFC', price:'₹1,622', chg:'+0.6%', color:'#00ff88'},
+  {sym:'ICICI', price:'₹1,284', chg:'+1.4%', color:'#00ff88'},
+  {sym:'NIFTY', price:'24,812', chg:'+0.9%', color:'#00ff88'},
+  {sym:'AAPL', price:'$224.80', chg:'+0.7%', color:'#00ff88'},
+  {sym:'NVDA', price:'$874.40', chg:'+2.1%', color:'#00ff88'},
+  {sym:'TSLA', price:'$185.30', chg:'-1.8%', color:'#ff3366'},
+  {sym:'MSFT', price:'$432.60', chg:'+0.5%', color:'#00ff88'},
+  {sym:'GOOGL', price:'$196.40', chg:'+1.1%', color:'#00ff88'},
+  {sym:'BTC/USD', price:'$98,440', chg:'+3.2%', color:'#00ff88'},
+  {sym:'ETH/USD', price:'$3,284', chg:'+1.8%', color:'#00ff88'},
+  {sym:'SOL/USD', price:'$182.40', chg:'+5.4%', color:'#00ff88'},
+  {sym:'BNB/USD', price:'$632', chg:'-0.6%', color:'#ff3366'},
+  {sym:'WIPRO', price:'₹312', chg:'+0.3%', color:'#00ff88'},
+  {sym:'BAJFINANCE', price:'₹7,842', chg:'+1.8%', color:'#00ff88'},
+  {sym:'SPY', price:'$582', chg:'+0.4%', color:'#00ff88'},
+];
+
+const tickerHTML = [...tickers, ...tickers].map(t =>
+  `<span class="ticker-item"><span class="ticker-sym">${t.sym}</span><span class="ticker-price">${t.price}</span><span style="color:${t.color};font-size:11px;">${t.chg}</span></span>`
+).join('');
+document.getElementById('tickerInner').innerHTML = tickerHTML;
+
+// ===== BOT DATA =====
+const bots = [
+  {
+    name: 'Technical Analysis Bot', type: 'ALGO · TA-LIB', icon: '📊', status: 'running',
+    confidence: 82, signal: 'BUY', signalType: 'signal-buy',
+    accuracy: '71.2%', trades: '1,284', pnl: '+₹4.2L', uptime: '99.8%',
+    lastSignal: 'NIFTY LONG @ 24,750', market: 'NSE · NYSE'
+  },
+  {
+    name: 'Fundamental Research Bot', type: 'AI · GPT-4', icon: '🔬', status: 'running',
+    confidence: 74, signal: 'HOLD', signalType: 'signal-hold',
+    accuracy: '68.4%', trades: '342', pnl: '+₹2.1L', uptime: '99.2%',
+    lastSignal: 'RELIANCE HOLD', market: 'NSE · BSE'
+  },
+  {
+    name: 'News Sentiment Bot', type: 'NLP · BERT', icon: '📰', status: 'running',
+    confidence: 89, signal: 'BUY', signalType: 'signal-buy',
+    accuracy: '66.8%', trades: '892', pnl: '+₹1.8L', uptime: '98.4%',
+    lastSignal: 'AAPL BUY (positive Q4)', market: 'NYSE · NASDAQ'
+  },
+  {
+    name: 'Quant/ML Prediction Bot', type: 'LSTM · TRANSFORMER', icon: '🧠', status: 'running',
+    confidence: 91, signal: 'BUY', signalType: 'signal-buy',
+    accuracy: '74.1%', trades: '2,142', pnl: '+₹8.4L', uptime: '99.9%',
+    lastSignal: 'BTC/USD LONG @ 97,800', market: 'CRYPTO · NSE'
+  },
+  {
+    name: 'Risk Management Bot', type: 'RISK ENGINE', icon: '🛡️', status: 'warning',
+    confidence: 98, signal: 'MONITOR', signalType: 'signal-neutral',
+    accuracy: 'N/A', trades: 'N/A', pnl: '-₹42K saved', uptime: '100%',
+    lastSignal: 'Exposure limit 34%', market: 'ALL MARKETS'
+  },
+  {
+    name: 'Trade Execution Bot', type: 'SOR · TWAP · VWAP', icon: '⚙️', status: 'running',
+    confidence: 99, signal: 'ACTIVE', signalType: 'signal-neutral',
+    accuracy: '99.2%', trades: '4,842', pnl: 'Fill rate', uptime: '99.7%',
+    lastSignal: 'TSLA SELL 50 shares', market: 'NSE · NYSE · CRYPTO'
+  },
+  {
+    name: 'Portfolio Monitoring Bot', type: 'ANALYTICS · RISK', icon: '📈', status: 'running',
+    confidence: 100, signal: 'HEALTHY', signalType: 'signal-buy',
+    accuracy: 'N/A', trades: 'N/A', pnl: 'Monitoring', uptime: '100%',
+    lastSignal: 'Portfolio up +2.34%', market: 'ALL MARKETS'
+  },
+  {
+    name: 'Crypto Arbitrage Bot', type: 'ARB · CROSS-EXCHANGE', icon: '🔄', status: 'stopped',
+    confidence: 0, signal: 'OFFLINE', signalType: 'signal-neutral',
+    accuracy: '82.4%', trades: '8,284', pnl: '+₹12.4L', uptime: '0%',
+    lastSignal: 'Maintenance mode', market: 'BINANCE · OKX'
+  }
+];
+
+function renderBots() {
+  const grid = document.getElementById('botGrid');
+  grid.innerHTML = bots.map((bot, i) => `
+    <div class="bot-card ${bot.status}" id="botcard-${i}">
+      <div class="bot-header">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:20px;">${bot.icon}</span>
+            <div>
+              <div class="bot-name">${bot.name}</div>
+              <div class="bot-type">${bot.type}</div>
+            </div>
+          </div>
+        </div>
+        <div class="bot-toggle ${bot.status==='running'?'on':''}" onclick="toggleBot(${i})" id="toggle-${i}"></div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:10px;color:var(--text-secondary);" class="mono">CONFIDENCE</span>
+        <span style="font-size:12px;" class="mono ${bot.status==='running'?'up':'neutral'}">${bot.confidence}%</span>
+      </div>
+      <div class="confidence-bar">
+        <div class="confidence-fill" style="width:${bot.confidence}%;background:${bot.status==='running'?'linear-gradient(90deg,var(--accent-cyan),var(--accent-green))':'var(--text-dim)'}"></div>
+      </div>
+      <div style="margin-top:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:10px;color:var(--text-secondary);" class="mono">LAST SIGNAL</span>
+          <span class="signal-badge ${bot.signalType}">${bot.signal}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;" class="mono">${bot.lastSignal}</div>
+      </div>
+      <div class="bot-stats">
+        <div class="bot-stat">
+          <div class="bot-stat-label">ACCURACY</div>
+          <div class="bot-stat-val up">${bot.accuracy}</div>
+        </div>
+        <div class="bot-stat">
+          <div class="bot-stat-label">TOTAL TRADES</div>
+          <div class="bot-stat-val" style="color:var(--text-primary);">${bot.trades}</div>
+        </div>
+        <div class="bot-stat">
+          <div class="bot-stat-label">P&L CONTRIBUTION</div>
+          <div class="bot-stat-val up">${bot.pnl}</div>
+        </div>
+        <div class="bot-stat">
+          <div class="bot-stat-label">UPTIME</div>
+          <div class="bot-stat-val" style="color:var(--accent-cyan);">${bot.uptime}</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-subtle);font-size:10px;color:var(--text-dim);" class="mono">
+        MARKETS: ${bot.market}
+      </div>
+    </div>
+  `).join('');
+}
+renderBots();
+
+function toggleBot(i) {
+  bots[i].status = bots[i].status === 'running' ? 'stopped' : 'running';
+  renderBots();
+}
+
+function toggleAllBots(on) {
+  bots.forEach(b => { if(b.name !== 'Crypto Arbitrage Bot') b.status = on ? 'running' : 'stopped'; });
+  renderBots();
+}
+
+// ===== MARKET DATA =====
+const indiaStocks = [
+  {sym:'RELIANCE', price:'₹2,847', chg:'+1.2%', vol:'4.2M', up:true},
+  {sym:'TCS', price:'₹3,912', chg:'+0.8%', vol:'2.1M', up:true},
+  {sym:'INFY', price:'₹1,484', chg:'-0.4%', vol:'3.8M', up:false},
+  {sym:'HDFC', price:'₹1,622', chg:'+0.6%', vol:'1.9M', up:true},
+  {sym:'BAJFINANCE', price:'₹7,842', chg:'+1.8%', vol:'890K', up:true},
+  {sym:'WIPRO', price:'₹312', chg:'+0.3%', vol:'5.1M', up:true},
+  {sym:'AXISBANK', price:'₹1,184', chg:'-0.7%', vol:'2.4M', up:false},
+  {sym:'MARUTI', price:'₹12,484', chg:'+1.1%', vol:'340K', up:true},
+];
+const usStocks = [
+  {sym:'AAPL', price:'$224.80', chg:'+0.7%', vol:'62M', up:true},
+  {sym:'NVDA', price:'$874.40', chg:'+2.1%', vol:'41M', up:true},
+  {sym:'TSLA', price:'$185.30', chg:'-1.8%', vol:'88M', up:false},
+  {sym:'MSFT', price:'$432.60', chg:'+0.5%', vol:'28M', up:true},
+  {sym:'GOOGL', price:'$196.40', chg:'+1.1%', vol:'34M', up:true},
+  {sym:'META', price:'$612.40', chg:'+0.9%', vol:'18M', up:true},
+  {sym:'AMZN', price:'$228.40', chg:'-0.3%', vol:'24M', up:false},
+  {sym:'SPY', price:'$582.00', chg:'+0.4%', vol:'72M', up:true},
+];
+const cryptos = [
+  {sym:'BTC/USD', price:'$98,440', chg:'+3.2%', vol:'$42B', up:true},
+  {sym:'ETH/USD', price:'$3,284', chg:'+1.8%', vol:'$18B', up:true},
+  {sym:'SOL/USD', price:'$182.40', chg:'+5.4%', vol:'$4.2B', up:true},
+  {sym:'BNB/USD', price:'$632', chg:'-0.6%', vol:'$2.1B', up:false},
+  {sym:'ADA/USD', price:'$0.84', chg:'+2.1%', vol:'$1.4B', up:true},
+  {sym:'XRP/USD', price:'$2.84', chg:'+4.2%', vol:'$3.8B', up:true},
+  {sym:'DOGE/USD', price:'$0.342', chg:'-1.2%', vol:'$840M', up:false},
+  {sym:'AVAX/USD', price:'$42.80', chg:'+3.8%', vol:'$620M', up:true},
+];
+
+function renderTable(id, data) {
+  const tbody = document.getElementById(id);
+  if (!tbody) return;
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td class="sym">${d.sym}</td>
+      <td class="price">${d.price}</td>
+      <td class="${d.up?'up':'down'}">${d.chg}</td>
+      <td style="color:var(--text-secondary);font-size:11px;" class="mono">${d.vol}</td>
+    </tr>
+  `).join('');
+}
+renderTable('indiaTable', indiaStocks);
+renderTable('usTable', usStocks);
+renderTable('cryptoTable', cryptos);
+
+// ===== POSITIONS =====
+const positions = [
+  {sym:'NIFTY 24800 CE', qty:50, entry:'₹182', ltp:'₹214', pnl:'+₹1,600', up:true},
+  {sym:'RELIANCE', qty:200, entry:'₹2,810', ltp:'₹2,847', pnl:'+₹7,400', up:true},
+  {sym:'BTC/USD', qty:0.5, entry:'$94,200', ltp:'$98,440', pnl:'+$2,120', up:true},
+  {sym:'TSLA', qty:100, entry:'$189.40', ltp:'$185.30', pnl:'-$410', up:false},
+  {sym:'ETH/USD', qty:4, entry:'$3,100', ltp:'$3,284', pnl:'+$736', up:true},
+  {sym:'HDFC BANK', qty:150, entry:'₹1,610', ltp:'₹1,622', pnl:'+₹1,800', up:true},
+];
+
+function renderPositions() {
+  const tbody = document.getElementById('positionsTable');
+  if (!tbody) return;
+  tbody.innerHTML = positions.map(p => `
+    <tr>
+      <td style="color:var(--text-primary);font-weight:700;">${p.sym}</td>
+      <td>${p.qty}</td>
+      <td style="color:var(--text-secondary);">${p.entry}</td>
+      <td style="color:var(--accent-cyan);">${p.ltp}</td>
+      <td class="${p.up?'up':'down'}">${p.pnl}</td>
+      <td><button style="background:rgba(255,51,102,0.1);border:1px solid rgba(255,51,102,0.3);color:var(--accent-red);padding:3px 8px;font-size:10px;cursor:pointer;border-radius:2px;font-family:'Rajdhani';letter-spacing:1px;" onclick="alert('Closing position: ${p.sym}')">CLOSE</button></td>
+    </tr>
+  `).join('');
+}
+renderPositions();
+
+// ===== STRATEGIES =====
+const strategies = [
+  {icon:'📊', name:'NIFTY Momentum Strategy', desc:'Rides NIFTY intraday momentum using RSI + MACD confluence', enabled:true, return:'+18.4%', sharpe:'2.14', trades:'284'},
+  {icon:'🔄', name:'US Sector Rotation', desc:'Rotates capital between S&P 500 sectors based on relative strength', enabled:true, return:'+12.8%', sharpe:'1.84', trades:'142'},
+  {icon:'₿', name:'Crypto Trend Following', desc:'Long/short crypto assets based on trend confirmation with volume', enabled:true, return:'+42.1%', sharpe:'1.92', trades:'892'},
+  {icon:'🧠', name:'ML Ensemble Strategy', desc:'Multi-model ensemble predictions combined with TA confirmations', enabled:true, return:'+24.8%', sharpe:'2.84', trades:'1,284'},
+  {icon:'📰', name:'News Sentiment Trading', desc:'Trade based on real-time news NLP sentiment score above threshold', enabled:true, return:'+8.4%', sharpe:'1.42', trades:'584'},
+  {icon:'⚡', name:'Options Premium Harvest', desc:'Systematic options writing on liquid index options for theta decay', enabled:false, return:'+6.2%', sharpe:'3.12', trades:'42'},
+  {icon:'🔀', name:'Pairs Trading (India)', desc:'Statistical arbitrage between correlated BSE/NSE stock pairs', enabled:false, return:'+4.8%', sharpe:'2.42', trades:'284'},
+  {icon:'🌙', name:'Overnight Gap Strategy', desc:'Capitalize on gap-up/down opens based on after-market signals', enabled:true, return:'+9.4%', sharpe:'1.62', trades:'184'},
+];
+
+function renderStrategies() {
+  const list = document.getElementById('strategyList');
+  if (!list) return;
+  list.innerHTML = strategies.map((s, i) => `
+    <div class="strategy-card ${s.enabled?'enabled':'disabled'}" id="strat-${i}">
+      <div class="strategy-icon">${s.icon}</div>
+      <div class="strategy-info">
+        <div class="strategy-name">${s.name}</div>
+        <div class="strategy-desc">${s.desc}</div>
+        <div class="strategy-stats">
+          <div class="strategy-stat"><span style="color:var(--text-secondary);font-size:10px;">RETURN: </span><span class="up">${s.return}</span></div>
+          <div class="strategy-stat"><span style="color:var(--text-secondary);font-size:10px;">SHARPE: </span><span style="color:var(--accent-cyan);">${s.sharpe}</span></div>
+          <div class="strategy-stat"><span style="color:var(--text-secondary);font-size:10px;">TRADES: </span><span>${s.trades}</span></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div class="bot-toggle ${s.enabled?'on':''}" onclick="toggleStrategy(${i})" id="stog-${i}"></div>
+        <span style="font-size:10px;font-weight:700;letter-spacing:1px;" class="mono ${s.enabled?'up':'neutral'}">${s.enabled?'ACTIVE':'STOPPED'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+renderStrategies();
+
+function toggleStrategy(i) {
+  strategies[i].enabled = !strategies[i].enabled;
+  renderStrategies();
+}
+
+// ===== ALERTS =====
+const alertData = [
+  {type:'critical', time:'14:32:18', msg:'Risk limit: Crypto exposure reached 25% threshold', ch:'📱 Telegram · ✉ Email'},
+  {type:'success', time:'14:28:44', msg:'Order filled: BTC/USD LONG 0.5 BTC @ $97,800 — Slippage: 0.02%', ch:'📱 Telegram'},
+  {type:'info', time:'14:25:12', msg:'ML Bot signal: NIFTY 24800 CE — Confidence 91% — BUY', ch:'🖥 Dashboard'},
+  {type:'warning', time:'14:18:58', msg:'TSLA position showing -2.1% drawdown — approaching stop loss', ch:'📱 Telegram · ✉ Email'},
+  {type:'success', time:'14:14:33', msg:'Strategy "NIFTY Momentum" executed: +₹12,400 profit locked', ch:'📱 Telegram'},
+  {type:'info', time:'14:08:21', msg:'Market open: NSE commenced trading — 284 watchlist symbols loaded', ch:'🖥 Dashboard'},
+  {type:'warning', time:'13:58:44', msg:'ML model inference latency degraded: 340ms (threshold: 200ms)', ch:'✉ Email · 🖥 Dashboard'},
+  {type:'success', time:'13:42:18', msg:'Fundamental Bot: RELIANCE earnings positive — adding to position', ch:'📱 Telegram'},
+];
+
+function renderAlerts() {
+  const feed = document.getElementById('alertFeed');
+  if (!feed) return;
+  feed.innerHTML = alertData.map(a => `
+    <div class="alert-item alert-${a.type}">
+      <div class="alert-time">${a.time}</div>
+      <div>
+        <div class="alert-msg">${a.msg}</div>
+        <div class="alert-channel">${a.ch}</div>
+      </div>
+    </div>
+  `).join('');
+}
+renderAlerts();
+
+function testAlert(channel) {
+  const msgs = {
+    telegram: '📱 Test alert sent to Telegram bot!',
+    email: '✉ Test alert sent to configured email!',
+    web: '🔔 Web push notification sent!'
+  };
+  const newAlert = {type:'info', time: new Date().toLocaleTimeString('en-IN', {hour12:false}), msg:`TEST: ${msgs[channel]}`, ch:`${channel.toUpperCase()}`};
+  alertData.unshift(newAlert);
+  renderAlerts();
+}
+
+// ===== CHARTS =====
+Chart.defaults.color = '#6a8fa8';
+Chart.defaults.borderColor = 'rgba(0,212,255,0.06)';
+
+function generateEquity(days=30) {
+  let v = 10000000, data=[];
+  for(let i=0;i<days;i++){
+    v += (Math.random()-0.42)*80000;
+    data.push(Math.round(v));
+  }
+  return data;
+}
+
+function generateTimestamps(n) {
+  const labels=[];
+  const now=new Date();
+  for(let i=n-1;i>=0;i--){
+    const d=new Date(now);
+    d.setDate(d.getDate()-i);
+    labels.push(d.toLocaleDateString('en-IN',{month:'short',day:'numeric'}));
+  }
+  return labels;
+}
+
+// Equity Chart
+const eqData = generateEquity(30);
+new Chart(document.getElementById('equityChart'), {
+  type:'line',
+  data:{
+    labels:generateTimestamps(30),
+    datasets:[{
+      label:'Portfolio Value',
+      data:eqData,
+      borderColor:'#00d4ff',
+      backgroundColor:'rgba(0,212,255,0.06)',
+      borderWidth:2,
+      fill:true,
+      tension:0.4,
+      pointRadius:0,
+      pointHoverRadius:4,
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'rgba(0,212,255,0.04)'},ticks:{font:{size:10,family:'Share Tech Mono'}}},
+      y:{grid:{color:'rgba(0,212,255,0.04)'},ticks:{font:{size:10,family:'Share Tech Mono'},callback:v=>'₹'+Math.round(v/100000)+'L'}}
+    }
+  }
+});
+
+// Exposure donut
+new Chart(document.getElementById('exposureChart'), {
+  type:'doughnut',
+  data:{
+    labels:['Indian Equity','US Equity','Crypto','Cash'],
+    datasets:[{
+      data:[34,28,25,13],
+      backgroundColor:['rgba(0,212,255,0.7)','rgba(0,102,255,0.7)','rgba(153,69,255,0.7)','rgba(42,74,98,0.5)'],
+      borderColor:['#00d4ff','#0066ff','#9945ff','#2a4a62'],
+      borderWidth:1
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{position:'bottom',labels:{font:{size:10,family:'Share Tech Mono'},padding:8,boxWidth:10}},
+    },
+    cutout:'65%'
+  }
+});
+
+// Volume Chart
+const volumeData=Array.from({length:48},()=>Math.floor(Math.random()*100+20));
+new Chart(document.getElementById('volumeChart'), {
+  type:'bar',
+  data:{
+    labels:Array.from({length:48},(_,i)=>`${String(Math.floor(i/2)).padStart(2,'0')}:${i%2===0?'00':'30'}`).filter((_,i)=>i%4===0),
+    datasets:[{
+      label:'Volume',
+      data:volumeData.filter((_,i)=>i%4===0),
+      backgroundColor:'rgba(0,212,255,0.3)',
+      borderColor:'#00d4ff',
+      borderWidth:1,
+      borderRadius:2,
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:9,family:'Share Tech Mono'}}},
+      y:{grid:{color:'rgba(0,212,255,0.04)'},ticks:{font:{size:9}}}
+    }
+  }
+});
+
+// NIFTY Chart
+function generateNifty() {
+  let v=24600,data=[];
+  for(let i=0;i<78;i++){v+=Math.round((Math.random()-0.45)*40);data.push(v);}
+  return data;
+}
+const niftyLabels=[];
+for(let h=9;h<=15;h++){for(let m=0;m<60;m+=5){if(h===15&&m>30)break;niftyLabels.push(`${h}:${String(m).padStart(2,'0')}`)}}
+
+new Chart(document.getElementById('niftyChart'), {
+  type:'line',
+  data:{
+    labels:niftyLabels,
+    datasets:[{
+      label:'NIFTY 50',
+      data:generateNifty(),
+      borderColor:'#00ff88',
+      backgroundColor:'rgba(0,255,136,0.05)',
+      borderWidth:1.5,
+      fill:true,
+      tension:0.3,
+      pointRadius:0,
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'rgba(0,212,255,0.04)'},ticks:{maxTicksLimit:8,font:{size:9,family:'Share Tech Mono'}}},
+      y:{grid:{color:'rgba(0,212,255,0.04)'},ticks:{font:{size:9,family:'Share Tech Mono'}}}
+    }
+  }
+});
+
+// BTC Chart
+function generateBTC() {
+  let v=94000,data=[];
+  for(let i=0;i<60;i++){v+=Math.round((Math.random()-0.44)*500);data.push(v);}
+  return data;
+}
+new Chart(document.getElementById('btcChart'), {
+  type:'line',
+  data:{
+    labels:Array.from({length:60},(_,i)=>`${i*4}H`).filter((_,i)=>i%5===0),
+    datasets:[{
+      label:'BTC/USD',
+      data:generateBTC().filter((_,i)=>i%5===0),
+      borderColor:'#ffaa00',
+      backgroundColor:'rgba(255,170,0,0.05)',
+      borderWidth:1.5,
+      fill:true,
+      tension:0.3,
+      pointRadius:0,
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'rgba(0,212,255,0.04)'},ticks:{font:{size:9,family:'Share Tech Mono'}}},
+      y:{grid:{color:'rgba(0,212,255,0.04)'},ticks:{font:{size:9,family:'Share Tech Mono'},callback:v=>'$'+v.toLocaleString()}}
+    }
+  }
+});
+
+// Allocation Chart
+new Chart(document.getElementById('allocChart'), {
+  type:'doughnut',
+  data:{
+    labels:['RELIANCE','TCS','BTC/USD','ETH/USD','NIFTY Options','AAPL','Other'],
+    datasets:[{
+      data:[18,12,14,8,10,9,29],
+      backgroundColor:['rgba(0,212,255,0.7)','rgba(0,255,136,0.7)','rgba(255,170,0,0.7)','rgba(153,69,255,0.7)','rgba(0,102,255,0.7)','rgba(255,51,102,0.5)','rgba(42,74,98,0.6)'],
+      borderWidth:1
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{position:'right',labels:{font:{size:10,family:'Share Tech Mono'},padding:8,boxWidth:10}}
+    },
+    cutout:'60%'
+  }
+});
+
+// Alert stats chart
+new Chart(document.getElementById('alertChart'), {
+  type:'bar',
+  data:{
+    labels:Array.from({length:24},(_,i)=>`${String(i).padStart(2,'0')}:00`),
+    datasets:[
+      {label:'Info',data:Array.from({length:24},()=>Math.floor(Math.random()*20+5)),backgroundColor:'rgba(0,212,255,0.5)',borderRadius:1},
+      {label:'Warning',data:Array.from({length:24},()=>Math.floor(Math.random()*8)),backgroundColor:'rgba(255,170,0,0.5)',borderRadius:1},
+      {label:'Critical',data:Array.from({length:24},()=>Math.floor(Math.random()*3)),backgroundColor:'rgba(255,51,102,0.5)',borderRadius:1},
+    ]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{font:{size:10,family:'Share Tech Mono'},padding:8,boxWidth:8}}},
+    scales:{
+      x:{stacked:true,grid:{display:false},ticks:{maxTicksLimit:12,font:{size:9}}},
+      y:{stacked:true,grid:{color:'rgba(0,212,255,0.04)'},ticks:{font:{size:9}}}
+    }
+  }
+});
+
+// ===== LIVE PRICE UPDATES =====
+function flickerPrice() {
+  const elements = document.querySelectorAll('.ticker-sym');
+  if(elements.length === 0) return;
+  const el = elements[Math.floor(Math.random() * elements.length)];
+  el.style.color = '#00d4ff';
+  setTimeout(() => { el.style.color = ''; }, 200);
+}
+setInterval(flickerPrice, 800);
+
+// Simulate P&L updates
+let pnlOffset = 0;
+setInterval(() => {
+  pnlOffset += Math.floor((Math.random() - 0.45) * 1000);
+  const base = 284120 + pnlOffset;
+  const portBase = 12482340 + pnlOffset * 4;
+  const el = document.getElementById('dailyPnl');
+  if(el) {
+    el.textContent = (base >= 0 ? '+₹' : '-₹') + Math.abs(base).toLocaleString('en-IN');
+    el.className = 'metric-value ' + (base >= 0 ? 'up' : 'down');
+  }
+}, 2000);
+
+// Add new alert periodically
+const liveAlerts = [
+  {type:'info', msg:'Quant Bot: SOL/USD breakout detected — confidence 88%', ch:'📱 Telegram'},
+  {type:'success', msg:'Trade executed: RELIANCE 100 shares BUY @ ₹2,847 — filled', ch:'📱 Telegram'},
+  {type:'warning', msg:'High volatility detected in BANKNIFTY — reducing position size', ch:'📱 Telegram · ✉ Email'},
+  {type:'info', msg:'NSE circuit filter triggered on YESBANK — position held', ch:'🖥 Dashboard'},
+];
+let alertIdx = 0;
+setInterval(() => {
+  const a = liveAlerts[alertIdx % liveAlerts.length];
+  alertIdx++;
+  const newAlert = {...a, time: new Date().toLocaleTimeString('en-IN', {hour12:false})};
+  alertData.unshift(newAlert);
+  if(alertData.length > 20) alertData.pop();
+  renderAlerts();
+}, 8000);
+
+console.log('%cNEXUS Algo Trading Platform v4.2', 'color:#00d4ff;font-size:16px;font-weight:bold;');
+console.log('%cAll systems operational. 7 bots active.', 'color:#00ff88;font-size:12px;');
+</script>
+</body>
+</html>
